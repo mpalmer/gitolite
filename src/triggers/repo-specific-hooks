@@ -38,12 +38,16 @@ while (<>) {
     # get the hook name
     $hook =~ s/^gitolite-options\.hook\.//;
 
-    unless ( $hook =~ /^(pre-receive|post-receive|post-update)$/ ) {
-        _warn "repo-specific-hooks: '$hook' is not one of the 3 hooks allowed, ignoring";
+    unless ( $hook =~ /^(pre-receive|post-receive|update|post-update)$/ ) {
+        _warn "repo-specific-hooks: '$hook' is not one of the hooks allowed ({pre,post}-receive, {,post-}update), ignoring";
         next;
     }
 
     my @codes = split /\s+/, $codes;
+
+    if ( $hook eq "update" ) {
+        unshift @codes, "gitolite-update"
+    }
 
     my $dst = "$repo.git/hooks/$hook";
     unlink( glob("$dst.*") );
@@ -55,7 +59,12 @@ while (<>) {
             next;
         }
 
-        my $src = $rc{LOCAL_CODE} . "/hooks/repo-specific/$code";
+        my $src;
+        if ( $hook eq "update" and $counter eq "h00" ) {
+            $src = $rc{GL_ADMIN_BASE} . "/hooks/common/update"
+        } else {
+            $src = $rc{LOCAL_CODE} . "/hooks/repo-specific/$code";
+        }
         my $dst = "$repo.git/hooks/$hook.$counter-$code";
         unless ( -x $src ) {
             _warn "repo-specific-hooks: '$src' doesn't exist or is not executable";
@@ -79,7 +88,7 @@ __DATA__
 # post-update takes args, pre/post-receive take stdin
 type=args
 stdin=''
-[ $0 != hooks/post-update ] && {
+[ $0 != hooks/post-update ] && [ $0 != hooks/update ] && {
     type=stdin
     stdin=`cat`
 }
